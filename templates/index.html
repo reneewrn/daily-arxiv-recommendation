@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Daily ArXiv — {{ selected_date }}{% endblock %}
+
+{% block content %}
+
+<!-- Date tabs -->
+<div class="flex gap-2 mb-6 overflow-x-auto pb-1">
+  {% for dc in date_counts %}
+  <a href="/?date={{ dc.date }}"
+     class="flex-shrink-0 px-3 py-1.5 rounded-full text-sm font-medium transition
+       {% if dc.date == selected_date %}
+         bg-indigo-600 text-white
+       {% else %}
+         bg-white border border-gray-200 text-gray-600 hover:border-indigo-400 hover:text-indigo-600
+       {% endif %}">
+    {{ dc.date }}
+    {% if dc.count > 0 %}
+      <span class="ml-1
+        {% if dc.date == selected_date %}text-indigo-200{% else %}text-gray-400{% endif %}">
+        ({{ dc.count }})
+      </span>
+    {% endif %}
+  </a>
+  {% endfor %}
+</div>
+
+<!-- Papers list -->
+{% if papers %}
+  <p class="text-sm text-gray-500 mb-4">{{ papers|length }} paper{{ 's' if papers|length != 1 }} on {{ selected_date }}</p>
+  <div class="space-y-5">
+    {% for paper in papers %}
+    <div class="bg-white rounded-lg border border-gray-200 p-5 shadow-sm hover:shadow-md transition">
+      <!-- Title -->
+      <a href="{{ paper.url }}" target="_blank" rel="noopener noreferrer"
+         class="text-base font-semibold text-indigo-700 hover:text-indigo-900 leading-snug block mb-2">
+        {{ paper.title }}
+      </a>
+      <!-- Categories -->
+      {% if paper.categories %}
+      <div class="flex flex-wrap gap-1.5 mb-3">
+        {% for cat in paper.categories %}
+        <span class="inline-block bg-indigo-50 text-indigo-700 text-xs font-medium px-2 py-0.5 rounded-full">
+          {{ cat }}
+        </span>
+        {% endfor %}
+      </div>
+      {% endif %}
+      <!-- Abstract -->
+      <p class="text-sm text-gray-600 leading-relaxed">{{ paper.abstract }}</p>
+    </div>
+    {% endfor %}
+  </div>
+
+{% else %}
+  <!-- Empty state -->
+  <div class="text-center py-20 text-gray-400">
+    <p class="text-4xl mb-4">📭</p>
+    <p class="text-lg font-medium text-gray-500">No papers for {{ selected_date }}</p>
+    {% if settings.channels|length == 0 %}
+      <p class="text-sm mt-2">Go to <a href="/settings" class="text-indigo-500 hover:underline">Settings</a> to add arxiv channels first.</p>
+    {% else %}
+      <p class="text-sm mt-2">Click <strong>Fetch Now</strong> to grab today's papers, or check back after 08:00 AM.</p>
+    {% endif %}
+  </div>
+{% endif %}
+
+{% endblock %}

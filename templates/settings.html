@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}Settings — Daily ArXiv{% endblock %}
+
+{% block content %}
+
+<h1 class="text-2xl font-semibold mb-6">Settings</h1>
+
+<form method="post" action="/settings" id="settings-form">
+  <!-- Channels -->
+  <section class="bg-white rounded-lg border border-gray-200 p-6 mb-6 shadow-sm">
+    <h2 class="text-lg font-medium mb-1">ArXiv Channels</h2>
+    <p class="text-sm text-gray-500 mb-4">
+      Enter arxiv category identifiers (e.g. <code class="bg-gray-100 px-1 rounded">cs.AI</code>,
+      <code class="bg-gray-100 px-1 rounded">cs.LG</code>, <code class="bg-gray-100 px-1 rounded">stat.ML</code>).
+      <a href="https://arxiv.org/category_taxonomy" target="_blank" class="text-indigo-500 hover:underline ml-1">Browse taxonomy →</a>
+    </p>
+
+    <div id="channels-tags" class="flex flex-wrap gap-2 mb-3">
+      {% for ch in settings.channels %}
+      <span class="tag-chip bg-indigo-50 text-indigo-700 text-sm px-3 py-1 rounded-full flex items-center gap-1">
+        {{ ch }}
+        <button type="button" onclick="removeTag(this, 'channels')"
+          class="text-indigo-400 hover:text-indigo-700 font-bold leading-none">&times;</button>
+      </span>
+      {% endfor %}
+    </div>
+
+    <div class="flex gap-2">
+      <input id="channel-input" type="text" placeholder="e.g. cs.AI"
+        class="border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 w-40" />
+      <button type="button" onclick="addTag('channel-input', 'channels')"
+        class="text-sm bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-md transition">Add</button>
+    </div>
+
+    <input type="hidden" name="channels" id="channels-hidden"
+      value="{{ settings.channels | join(',') }}" />
+  </section>
+
+  <!-- Keywords -->
+  <section class="bg-white rounded-lg border border-gray-200 p-6 mb-6 shadow-sm">
+    <h2 class="text-lg font-medium mb-1">Keywords</h2>
+    <p class="text-sm text-gray-500 mb-4">
+      Papers whose title or abstract contain any of these keywords (case-insensitive) will be shown.
+      Leave empty to show all papers from the selected channels.
+    </p>
+
+    <div id="keywords-tags" class="flex flex-wrap gap-2 mb-3">
+      {% for kw in settings.keywords %}
+      <span class="tag-chip bg-emerald-50 text-emerald-700 text-sm px-3 py-1 rounded-full flex items-center gap-1">
+        {{ kw }}
+        <button type="button" onclick="removeTag(this, 'keywords')"
+          class="text-emerald-400 hover:text-emerald-700 font-bold leading-none">&times;</button>
+      </span>
+      {% endfor %}
+    </div>
+
+    <div class="flex gap-2">
+      <input id="keyword-input" type="text" placeholder="e.g. diffusion"
+        class="border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 w-40" />
+      <button type="button" onclick="addTag('keyword-input', 'keywords')"
+        class="text-sm bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-md transition">Add</button>
+    </div>
+
+    <input type="hidden" name="keywords" id="keywords-hidden"
+      value="{{ settings.keywords | join(',') }}" />
+  </section>
+
+  <button type="submit"
+    class="bg-indigo-600 text-white px-5 py-2 rounded-md hover:bg-indigo-700 transition text-sm font-medium">
+    Save Settings
+  </button>
+</form>
+
+<script>
+  function getTagValues(group) {
+    const container = document.getElementById(group + '-tags');
+    return Array.from(container.querySelectorAll('.tag-chip'))
+      .map(chip => chip.childNodes[0].textContent.trim())
+      .filter(Boolean);
+  }
+
+  function syncHidden(group) {
+    document.getElementById(group + '-hidden').value = getTagValues(group).join(',');
+  }
+
+  function addTag(inputId, group) {
+    const input = document.getElementById(inputId);
+    const val = input.value.trim();
+    if (!val) return;
+
+    const existing = getTagValues(group);
+    if (existing.includes(val)) { input.value = ''; return; }
+
+    const isChannel = group === 'channels';
+    const chipClass = isChannel
+      ? 'bg-indigo-50 text-indigo-700'
+      : 'bg-emerald-50 text-emerald-700';
+    const btnClass = isChannel
+      ? 'text-indigo-400 hover:text-indigo-700'
+      : 'text-emerald-400 hover:text-emerald-700';
+
+    const chip = document.createElement('span');
+    chip.className = `tag-chip ${chipClass} text-sm px-3 py-1 rounded-full flex items-center gap-1`;
+    chip.innerHTML = `${val} <button type="button" onclick="removeTag(this, '${group}')" class="${btnClass} font-bold leading-none">&times;</button>`;
+    document.getElementById(group + '-tags').appendChild(chip);
+    input.value = '';
+    syncHidden(group);
+  }
+
+  function removeTag(btn, group) {
+    btn.parentElement.remove();
+    syncHidden(group);
+  }
+
+  // Allow Enter key to add tags
+  document.getElementById('channel-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); addTag('channel-input', 'channels'); }
+  });
+  document.getElementById('keyword-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); addTag('keyword-input', 'keywords'); }
+  });
+</script>
+
+{% endblock %}
