@@ -2,12 +2,14 @@ import logging
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
+from tzlocal import get_localzone
 
 import fetcher
 
 logger = logging.getLogger(__name__)
 
-_scheduler = BackgroundScheduler()
+_local_tz = get_localzone()
+_scheduler = BackgroundScheduler(timezone=_local_tz)
 
 
 def _daily_job():
@@ -19,7 +21,7 @@ def _daily_job():
 def start(run_now_if_empty: bool = False):
     _scheduler.add_job(
         _daily_job,
-        trigger=CronTrigger(hour=8, minute=0),
+        trigger=CronTrigger(hour=8, minute=0, timezone=_local_tz),
         id="daily_fetch",
         replace_existing=True,
     )
