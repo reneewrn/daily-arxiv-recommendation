@@ -7,6 +7,6 @@ dependencies = [
     "uvicorn[standard]",
     "jinja2",
     "python-multipart",
-    "feedparser",
+    "beautifulsoup4",
     "apscheduler",
 ]
