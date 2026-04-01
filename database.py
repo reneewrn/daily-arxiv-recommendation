@@ -125,10 +125,3 @@ def delete_old_papers(keep_days: int = 7) -> None:
         conn.execute("DELETE FROM papers WHERE date < ?", (cutoff,))
 
 
-def has_papers_for_today() -> bool:
-    today = date.today().isoformat()
-    with get_conn() as conn:
-        row = conn.execute(
-            "SELECT COUNT(*) as c FROM papers WHERE date=?", (today,)
-        ).fetchone()
-    return row["c"] > 0

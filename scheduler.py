@@ -8,31 +8,28 @@ import fetcher
 
 logger = logging.getLogger(__name__)
 
-_local_tz = get_localzone()
-_scheduler = BackgroundScheduler(timezone=_local_tz)
+_scheduler = BackgroundScheduler(timezone=get_localzone())
 
 
 def _daily_job():
-    logger.info("Running scheduled arxiv fetch...")
-    result = fetcher.fetch_and_store()
-    logger.info("Fetch complete: %s", result)
+    try:
+        logger.info("Running scheduled arxiv fetch...")
+        result = fetcher.fetch_and_store()
+        logger.info("Fetch complete: %s", result)
+    except Exception:
+        logger.exception("Scheduled fetch failed")
 
 
-def start(run_now_if_empty: bool = False):
+def start():
     _scheduler.add_job(
         _daily_job,
-        trigger=CronTrigger(hour=8, minute=0, timezone=_local_tz),
+        trigger=CronTrigger(hour=8, minute=0),
         id="daily_fetch",
         replace_existing=True,
     )
     _scheduler.start()
-    logger.info("Scheduler started. Daily fetch at 08:00 local time.")
-
-    if run_now_if_empty:
-        import database
-        if not database.has_papers_for_today():
-            logger.info("No papers for today — fetching now...")
-            _daily_job()
+    logger.info("Scheduler started (tz=%s). Daily fetch at 08:00.", _scheduler.timezone)
+    _daily_job()  # always fetch on startup
 
 
 def stop():

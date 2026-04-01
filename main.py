@@ -19,7 +19,7 @@ templates = Jinja2Templates(directory="templates")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     database.init_db()
-    scheduler.start(run_now_if_empty=True)
+    scheduler.start()
     yield
     scheduler.stop()
 
