@@ -42,8 +42,8 @@ def _parse_papers(html: str) -> list[dict]:
 
     papers = []
     for dl in all_dls:
-        prev_h3 = dl.find_previous_sibling("h3")
-        is_replacement = bool(prev_h3 and "Replacement" in prev_h3.text)
+        section_h3 = dl.find("h3")
+        is_replacement = bool(section_h3 and "Replacement" in section_h3.text)
 
         current_dt = None
         for element in dl.children:

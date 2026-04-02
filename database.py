@@ -161,7 +161,7 @@ def get_papers_for_date(date_str: str) -> list[dict]:
         d["authors"] = json.loads(d.get("authors") or "[]")
         d["affiliations"] = json.loads(d.get("affiliations") or "{}")
         d["comments"] = d.get("comments") or ""
-        d["is_replacement"] = bool(d.get("is_replacement"))
+        d["is_replacement"] = d.get("is_replacement") in (1, "1", True)
         result.append(d)
     return result
 
