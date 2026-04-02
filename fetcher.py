@@ -188,17 +188,6 @@ def fetch_and_store() -> dict:
             if _matches_keywords(paper["title"], paper["abstract"], keywords):
                 papers_to_store.append(paper)
 
-    # Fetch affiliations via arXiv API
-    arxiv_ids = [p["arxiv_id"] for p in papers_to_store]
-    try:
-        all_affiliations = _fetch_affiliations(arxiv_ids)
-    except Exception as e:
-        logger.error("Affiliation fetch failed: %s", e)
-        all_affiliations = {}
-
-    for paper in papers_to_store:
-        paper["affiliations"] = all_affiliations.get(paper["arxiv_id"], {})
-
     if paper_date:
         database.delete_papers_for_date(paper_date)
 
