@@ -29,15 +29,43 @@
   <p class="text-sm text-gray-500 mb-4">{{ papers|length }} paper{{ 's' if papers|length != 1 }} on {{ selected_date }}</p>
   <div class="space-y-5">
     {% for paper in papers %}
-    <div class="bg-white rounded-lg border border-gray-200 p-5 shadow-sm hover:shadow-md transition">
+    <div class="rounded-lg border p-5 shadow-sm hover:shadow-md transition
+      {% if paper.is_whitelisted %}
+        bg-green-50 border-green-300 ring-2 ring-green-200
+      {% elif paper.is_blacklisted %}
+        bg-gray-50 border-gray-200 opacity-50
+      {% else %}
+        bg-white border-gray-200
+      {% endif %}">
       <!-- Title -->
       <a href="{{ paper.url }}" target="_blank" rel="noopener noreferrer"
-         class="text-base font-semibold text-indigo-700 hover:text-indigo-900 leading-snug block mb-2">
+         class="text-base font-semibold text-indigo-700 hover:text-indigo-900 leading-snug block mb-1">
         {{ paper.title }}
       </a>
-      <!-- Categories -->
-      {% if paper.categories %}
+      <!-- Authors -->
+      {% if paper.authors %}
+      <p class="text-sm text-gray-500 mb-2">
+        {% for author in paper.authors[:10] %}
+          <span>{{ author }}{% if paper.affiliations.get(author) %} <span class="text-gray-400 text-xs">({{ paper.affiliations[author] }})</span>{% endif %}</span>{% if not loop.last %}, {% endif %}
+        {% endfor %}
+        {% if paper.authors|length > 10 %}
+          <span class="text-gray-400 text-xs">and {{ paper.authors|length - 10 }} more</span>
+        {% endif %}
+      </p>
+      {% endif %}
+      <!-- Categories & Conference badge -->
+      {% if paper.categories or paper.conference %}
       <div class="flex flex-wrap gap-1.5 mb-3">
+        {% if paper.is_replacement %}
+        <span class="inline-block bg-purple-100 text-purple-800 text-xs font-bold px-2.5 py-0.5 rounded-full border border-purple-300">
+          Replacement
+        </span>
+        {% endif %}
+        {% if paper.conference %}
+        <span class="inline-block bg-amber-100 text-amber-800 text-xs font-bold px-2.5 py-0.5 rounded-full border border-amber-300">
+          {{ paper.conference }}
+        </span>
+        {% endif %}
         {% for cat in paper.categories %}
         <span class="inline-block bg-indigo-50 text-indigo-700 text-xs font-medium px-2 py-0.5 rounded-full">
           {{ cat }}

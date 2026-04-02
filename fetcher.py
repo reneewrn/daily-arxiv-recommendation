@@ -2,6 +2,7 @@ import logging
 import re
 import time
 import urllib.request
+import xml.etree.ElementTree as ET
 from datetime import datetime
 
 from bs4 import BeautifulSoup
@@ -42,8 +43,7 @@ def _parse_papers(html: str) -> list[dict]:
     papers = []
     for dl in all_dls:
         prev_h3 = dl.find_previous_sibling("h3")
-        if prev_h3 and "Replacement" in prev_h3.text:
-            continue
+        is_replacement = bool(prev_h3 and "Replacement" in prev_h3.text)
 
         current_dt = None
         for element in dl.children:
@@ -66,6 +66,16 @@ def _parse_papers(html: str) -> list[dict]:
                 abstract_p = element.find("p", class_="mathjax")
                 abstract = abstract_p.get_text(separator=" ").strip() if abstract_p else ""
 
+                # Authors
+                authors_div = element.find("div", class_="list-authors")
+                authors = [a.get_text().strip() for a in authors_div.find_all("a")] if authors_div else []
+
+                # Comments (optional field)
+                comments_div = element.find("div", class_="list-comments")
+                comments = comments_div.get_text(separator=" ").strip() if comments_div else ""
+                if comments.lower().startswith("comments:"):
+                    comments = comments[len("comments:"):].strip()
+
                 # Categories — extract codes like "cs.AI" from "(cs.AI)"
                 subjects_div = element.find("div", class_="list-subjects")
                 categories = re.findall(r"\(([^)]+)\)", subjects_div.text) if subjects_div else []
@@ -77,10 +87,66 @@ def _parse_papers(html: str) -> list[dict]:
                     "abstract": abstract,
                     "url": url,
                     "categories": categories,
+                    "authors": authors,
+                    "comments": comments,
+                    "is_replacement": is_replacement,
                 })
                 current_dt = None
 
     return papers
+
+
+ARXIV_API_URL = "http://export.arxiv.org/api/query"
+ATOM_NS = "{http://www.w3.org/2005/Atom}"
+ARXIV_NS = "{http://arxiv.org/schemas/atom}"
+
+
+def _fetch_affiliations(arxiv_ids: list[str]) -> dict[str, dict[str, str]]:
+    """Batch-fetch author affiliations via the arXiv API.
+    Returns {arxiv_id: {author_name: affiliation}}."""
+    if not arxiv_ids:
+        return {}
+
+    result: dict[str, dict[str, str]] = {}
+    batch_size = 100
+
+    for start in range(0, len(arxiv_ids), batch_size):
+        if start > 0:
+            time.sleep(3)  # arXiv API rate limit
+        batch = arxiv_ids[start : start + batch_size]
+        id_list = ",".join(batch)
+        url = f"{ARXIV_API_URL}?id_list={id_list}&max_results={len(batch)}"
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "daily-arxiv/0.1"})
+            resp = urllib.request.urlopen(req, timeout=30)
+            xml_data = resp.read().decode()
+        except Exception as e:
+            logger.error("arXiv API request failed: %s", e)
+            continue
+
+        try:
+            root = ET.fromstring(xml_data)
+        except ET.ParseError as e:
+            logger.error("Failed to parse arXiv API XML: %s", e)
+            continue
+
+        for entry in root.findall(f"{ATOM_NS}entry"):
+            entry_id = entry.findtext(f"{ATOM_NS}id", "")
+            # Extract arxiv_id from URL like http://arxiv.org/abs/2403.12345v1
+            aid = entry_id.rsplit("/", 1)[-1]
+            aid = re.sub(r"v\d+$", "", aid)  # strip version suffix
+
+            affiliations: dict[str, str] = {}
+            for author_el in entry.findall(f"{ATOM_NS}author"):
+                name = author_el.findtext(f"{ATOM_NS}name", "").strip()
+                aff_el = author_el.find(f"{ARXIV_NS}affiliation")
+                if name and aff_el is not None and aff_el.text:
+                    affiliations[name] = aff_el.text.strip()
+
+            if affiliations:
+                result[aid] = affiliations
+
+    return result
 
 
 def _matches_keywords(title: str, abstract: str, keywords: list[str]) -> bool:
@@ -121,6 +187,17 @@ def fetch_and_store() -> dict:
             fetched_total += 1
             if _matches_keywords(paper["title"], paper["abstract"], keywords):
                 papers_to_store.append(paper)
+
+    # Fetch affiliations via arXiv API
+    arxiv_ids = [p["arxiv_id"] for p in papers_to_store]
+    try:
+        all_affiliations = _fetch_affiliations(arxiv_ids)
+    except Exception as e:
+        logger.error("Affiliation fetch failed: %s", e)
+        all_affiliations = {}
+
+    for paper in papers_to_store:
+        paper["affiliations"] = all_affiliations.get(paper["arxiv_id"], {})
 
     if paper_date:
         database.delete_papers_for_date(paper_date)

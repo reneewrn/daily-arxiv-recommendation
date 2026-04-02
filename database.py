@@ -18,8 +18,17 @@ def get_conn():
         conn.close()
 
 
+DEFAULT_CONFERENCES = [
+    "NeurIPS", "ICML", "ICLR", "CVPR", "ICCV", "ECCV",
+    "ACL", "EMNLP", "NAACL", "COLING", "COLM",
+    "AAAI", "IJCAI", "AISTATS", "UAI", "COLT",
+    "SIGIR", "KDD", "WWW", "CHI", "INTERSPEECH",
+]
+
+
 def init_db() -> None:
     with get_conn() as conn:
+        # Create base tables (original schema)
         conn.executescript("""
             CREATE TABLE IF NOT EXISTS papers (
                 id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -41,24 +50,70 @@ def init_db() -> None:
             INSERT OR IGNORE INTO settings(id, channels, keywords)
                 VALUES (1, '[]', '[]');
         """)
+        # Migrate: add new columns if missing
+        for col, default in [
+            ("authors", "'[]'"),
+            ("comments", "''"),
+            ("affiliations", "'{}'"),
+            ("is_replacement", "0"),
+        ]:
+            try:
+                conn.execute(f"ALTER TABLE papers ADD COLUMN {col} TEXT NOT NULL DEFAULT {default}")
+            except sqlite3.OperationalError:
+                pass
+        for col, default in [
+            ("conferences", "'[]'"),
+            ("author_whitelist", "'[]'"),
+            ("author_blacklist", "'[]'"),
+        ]:
+            try:
+                conn.execute(f"ALTER TABLE settings ADD COLUMN {col} TEXT NOT NULL DEFAULT {default}")
+            except sqlite3.OperationalError:
+                pass
+        # Seed default conferences if empty
+        row = conn.execute("SELECT conferences FROM settings WHERE id=1").fetchone()
+        if row and json.loads(row["conferences"]) == []:
+            conn.execute(
+                "UPDATE settings SET conferences=? WHERE id=1",
+                (json.dumps(DEFAULT_CONFERENCES),),
+            )
 
 
 # ---------- Settings ----------
 
 def get_settings() -> dict:
     with get_conn() as conn:
-        row = conn.execute("SELECT channels, keywords FROM settings WHERE id=1").fetchone()
+        row = conn.execute(
+            "SELECT channels, keywords, conferences, author_whitelist, author_blacklist "
+            "FROM settings WHERE id=1"
+        ).fetchone()
     return {
         "channels": json.loads(row["channels"]),
         "keywords": json.loads(row["keywords"]),
+        "conferences": json.loads(row["conferences"]),
+        "author_whitelist": json.loads(row["author_whitelist"]),
+        "author_blacklist": json.loads(row["author_blacklist"]),
     }
 
 
-def save_settings(channels: list[str], keywords: list[str]) -> None:
+def save_settings(
+    channels: list[str],
+    keywords: list[str],
+    conferences: list[str] | None = None,
+    author_whitelist: list[str] | None = None,
+    author_blacklist: list[str] | None = None,
+) -> None:
     with get_conn() as conn:
         conn.execute(
-            "UPDATE settings SET channels=?, keywords=? WHERE id=1",
-            (json.dumps(channels), json.dumps(keywords)),
+            "UPDATE settings SET channels=?, keywords=?, conferences=?, "
+            "author_whitelist=?, author_blacklist=? WHERE id=1",
+            (
+                json.dumps(channels),
+                json.dumps(keywords),
+                json.dumps(conferences if conferences is not None else []),
+                json.dumps(author_whitelist if author_whitelist is not None else []),
+                json.dumps(author_blacklist if author_blacklist is not None else []),
+            ),
         )
 
 
@@ -71,8 +126,10 @@ def upsert_papers(papers: list[dict]) -> int:
         for p in papers:
             cur = conn.execute(
                 """
-                INSERT OR IGNORE INTO papers(arxiv_id, date, title, abstract, url, categories)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT OR IGNORE INTO papers(
+                    arxiv_id, date, title, abstract, url, categories,
+                    authors, comments, affiliations, is_replacement
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     p["arxiv_id"],
@@ -81,6 +138,10 @@ def upsert_papers(papers: list[dict]) -> int:
                     p.get("abstract", ""),
                     p["url"],
                     json.dumps(p.get("categories", [])),
+                    json.dumps(p.get("authors", [])),
+                    p.get("comments", ""),
+                    json.dumps(p.get("affiliations", {})),
+                    1 if p.get("is_replacement") else 0,
                 ),
             )
             inserted += cur.rowcount
@@ -97,6 +158,10 @@ def get_papers_for_date(date_str: str) -> list[dict]:
     for row in rows:
         d = dict(row)
         d["categories"] = json.loads(d["categories"] or "[]")
+        d["authors"] = json.loads(d.get("authors") or "[]")
+        d["affiliations"] = json.loads(d.get("affiliations") or "{}")
+        d["comments"] = d.get("comments") or ""
+        d["is_replacement"] = bool(d.get("is_replacement"))
         result.append(d)
     return result
 
