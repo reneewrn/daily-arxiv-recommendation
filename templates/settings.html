@@ -149,6 +149,17 @@
       value="{{ settings.author_blacklist | join(',') }}" />
   </section>
 
+  <!-- Fetch Schedule -->
+  <section class="bg-white rounded-lg border border-gray-200 p-6 mb-6 shadow-sm">
+    <h2 class="text-lg font-medium mb-1">Daily Fetch Time</h2>
+    <p class="text-sm text-gray-500 mb-4">
+      Papers will be automatically fetched at this time each day (local timezone).
+    </p>
+    <input type="time" name="fetch_time"
+      value="{{ '%02d:%02d' | format(settings.fetch_hour, settings.fetch_minute) }}"
+      class="border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+  </section>
+
   <button type="submit"
     class="bg-indigo-600 text-white px-5 py-2 rounded-md hover:bg-indigo-700 transition text-sm font-medium">
     Save Settings

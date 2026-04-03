@@ -98,13 +98,21 @@ async def save_settings(
     conferences: str = Form(default=""),
     author_whitelist: str = Form(default=""),
     author_blacklist: str = Form(default=""),
+    fetch_time: str = Form(default="08:00"),
 ):
     ch = [c.strip() for c in channels.split(",") if c.strip()]
     kw = [k.strip() for k in keywords.split(",") if k.strip()]
     conf = [c.strip() for c in conferences.split(",") if c.strip()]
     wl = [a.strip() for a in author_whitelist.split(",") if a.strip()]
     bl = [a.strip() for a in author_blacklist.split(",") if a.strip()]
-    database.save_settings(ch, kw, conf, wl, bl)
+    # Parse HH:MM time string
+    try:
+        parts = fetch_time.split(":")
+        hour, minute = int(parts[0]), int(parts[1])
+    except (ValueError, IndexError):
+        hour, minute = 8, 0
+    database.save_settings(ch, kw, conf, wl, bl, hour, minute)
+    scheduler.reschedule()
     return RedirectResponse("/settings", status_code=303)
 
 

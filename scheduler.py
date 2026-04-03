@@ -4,6 +4,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from tzlocal import get_localzone
 
+import database
 import fetcher
 
 logger = logging.getLogger(__name__)
@@ -20,15 +21,23 @@ def _daily_job():
         logger.exception("Scheduled fetch failed")
 
 
-def start():
+def reschedule():
+    """Update the daily fetch schedule from current settings."""
+    settings = database.get_settings()
+    hour = settings["fetch_hour"]
+    minute = settings["fetch_minute"]
     _scheduler.add_job(
         _daily_job,
-        trigger=CronTrigger(hour=8, minute=0),
+        trigger=CronTrigger(hour=hour, minute=minute),
         id="daily_fetch",
         replace_existing=True,
     )
+    logger.info("Daily fetch scheduled at %02d:%02d (tz=%s).", hour, minute, _scheduler.timezone)
+
+
+def start():
+    reschedule()
     _scheduler.start()
-    logger.info("Scheduler started (tz=%s). Daily fetch at 08:00.", _scheduler.timezone)
     _daily_job()  # always fetch on startup
 
 

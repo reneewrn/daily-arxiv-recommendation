@@ -65,6 +65,8 @@ def init_db() -> None:
             ("conferences", "'[]'"),
             ("author_whitelist", "'[]'"),
             ("author_blacklist", "'[]'"),
+            ("fetch_hour", "8"),
+            ("fetch_minute", "0"),
         ]:
             try:
                 conn.execute(f"ALTER TABLE settings ADD COLUMN {col} TEXT NOT NULL DEFAULT {default}")
@@ -84,8 +86,8 @@ def init_db() -> None:
 def get_settings() -> dict:
     with get_conn() as conn:
         row = conn.execute(
-            "SELECT channels, keywords, conferences, author_whitelist, author_blacklist "
-            "FROM settings WHERE id=1"
+            "SELECT channels, keywords, conferences, author_whitelist, author_blacklist, "
+            "fetch_hour, fetch_minute FROM settings WHERE id=1"
         ).fetchone()
     return {
         "channels": json.loads(row["channels"]),
@@ -93,6 +95,8 @@ def get_settings() -> dict:
         "conferences": json.loads(row["conferences"]),
         "author_whitelist": json.loads(row["author_whitelist"]),
         "author_blacklist": json.loads(row["author_blacklist"]),
+        "fetch_hour": int(row["fetch_hour"]),
+        "fetch_minute": int(row["fetch_minute"]),
     }
 
 
@@ -102,17 +106,21 @@ def save_settings(
     conferences: list[str] | None = None,
     author_whitelist: list[str] | None = None,
     author_blacklist: list[str] | None = None,
+    fetch_hour: int = 8,
+    fetch_minute: int = 0,
 ) -> None:
     with get_conn() as conn:
         conn.execute(
             "UPDATE settings SET channels=?, keywords=?, conferences=?, "
-            "author_whitelist=?, author_blacklist=? WHERE id=1",
+            "author_whitelist=?, author_blacklist=?, fetch_hour=?, fetch_minute=? WHERE id=1",
             (
                 json.dumps(channels),
                 json.dumps(keywords),
                 json.dumps(conferences if conferences is not None else []),
                 json.dumps(author_whitelist if author_whitelist is not None else []),
                 json.dumps(author_blacklist if author_blacklist is not None else []),
+                fetch_hour,
+                fetch_minute,
             ),
         )
 
